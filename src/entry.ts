@@ -109,7 +109,7 @@ if (
     Promise.all([import("./version.js"), import("./infra/git-commit.js")])
       .then(([{ VERSION }, { resolveCommitHash }]) => {
         const commit = resolveCommitHash({ moduleUrl: import.meta.url });
-        console.log(commit ? `OpenClaw ${VERSION} (${commit})` : `OpenClaw ${VERSION}`);
+        console.log(commit ? `OpenOrchestra ${VERSION} (${commit})` : `OpenOrchestra ${VERSION}`);
         process.exit(0);
       })
       .catch((error) => {

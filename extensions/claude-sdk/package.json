@@ -1,0 +1,15 @@
+{
+  "name": "@openclaw/claude-sdk-provider",
+  "version": "2026.3.27",
+  "private": true,
+  "description": "OpenClaw Claude Agent SDK provider - uses Claude subscription instead of API",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.2.86"
+  }
+}

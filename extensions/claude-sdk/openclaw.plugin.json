@@ -1,0 +1,25 @@
+{
+  "id": "claude-sdk",
+  "enabledByDefault": true,
+  "providers": ["claude-sdk"],
+  "providerAuthEnvVars": {
+    "claude-sdk": []
+  },
+  "providerAuthChoices": [
+    {
+      "provider": "claude-sdk",
+      "method": "subscription",
+      "choiceId": "claude-sdk-subscription",
+      "choiceLabel": "Claude SDK (subscription)",
+      "choiceHint": "Use local Claude CLI with your Pro/Max subscription - no API key needed",
+      "groupId": "claude-sdk",
+      "groupLabel": "Claude SDK",
+      "groupHint": "Claude Code subscription (no API key)"
+    }
+  ],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

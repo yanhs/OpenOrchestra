@@ -20,8 +20,18 @@ type AgentsListOptions = {
   bindings?: boolean;
 };
 
+function resolveAgentIndicator(summary: AgentSummary): string {
+  // Blue indicator for OpenOrchestra (claude-sdk) agents, green for Claude API agents
+  const model = summary.model ?? "";
+  if (model.startsWith("claude-sdk/")) {
+    return "🔵";
+  }
+  return "🟢";
+}
+
 function formatSummary(summary: AgentSummary) {
   const defaultTag = summary.isDefault ? " (default)" : "";
+  const indicator = resolveAgentIndicator(summary);
   const header =
     summary.name && summary.name !== summary.id
       ? `${summary.id}${defaultTag} (${summary.name})`
@@ -42,7 +52,7 @@ function formatSummary(summary: AgentSummary) {
         ? "config"
         : null;
 
-  const lines = [`- ${header}`];
+  const lines = [`${indicator} ${header}`];
   if (identityLine) {
     lines.push(`  Identity: ${identityLine}${identitySource ? ` (${identitySource})` : ""}`);
   }
@@ -121,12 +131,22 @@ export async function agentsListCommand(
     }
   }
 
+  // Sort: Claude API agents (🟢) first, OpenOrchestra SDK agents (🔵) last
+  summaries.sort((a, b) => {
+    const aIsSdk = (a.model ?? "").startsWith("claude-sdk/") ? 1 : 0;
+    const bIsSdk = (b.model ?? "").startsWith("claude-sdk/") ? 1 : 0;
+    return aIsSdk - bIsSdk;
+  });
+
   if (opts.json) {
     writeRuntimeJson(runtime, summaries);
     return;
   }
 
-  const lines = ["Agents:", ...summaries.map(formatSummary)];
+  const lines = [
+    "Agents:  🟢 Claude API  🔵 Claude SDK (subscription)",
+    ...summaries.map(formatSummary),
+  ];
   lines.push("Routing rules map channel/account/peer to an agent. Use --bindings for full rules.");
   lines.push(
     `Channel status reflects local config/creds. For live health: ${formatCliCommand("openclaw channels status --probe")}.`,

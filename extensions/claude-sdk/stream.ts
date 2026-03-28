@@ -249,6 +249,7 @@ export function createClaudeSdkStreamFn(opts: ClaudeSdkStreamOptions = {}): Stre
     const stream = createAssistantMessageEventStream();
 
     const run = async () => {
+      const stderrLines: string[] = [];
       try {
         // Dynamic import to avoid loading the heavy SDK bundle eagerly
         const sdk = await import("@anthropic-ai/claude-agent-sdk");
@@ -271,14 +272,32 @@ export function createClaudeSdkStreamFn(opts: ClaudeSdkStreamOptions = {}): Stre
         // Resolve model alias for Claude CLI
         const modelId = resolveClaudeModel(model.id);
 
-        // Build SDK options
+        // Build SDK options — resolve cwd from options, env, or process.cwd()
+        const resolvedCwd =
+          opts.cwd ??
+          process.env.OPENCLAW_WORKSPACE ??
+          (process.env.HOME ? `${process.env.HOME}/.openclaw/workspace` : process.cwd());
+
+        // Resolve the Claude CLI path — needed when running from bundled dist
+        const { execSync } = await import("node:child_process");
+        let claudePath: string | undefined;
+        try {
+          claudePath = execSync("which claude", { encoding: "utf8" }).trim();
+        } catch {
+          // Fallback: try well-known paths
+          const wellKnown = [`${process.env.HOME}/.local/bin/claude`, "/usr/local/bin/claude"];
+          const fsMod = await import("node:fs");
+          claudePath = wellKnown.find((p) => fsMod.existsSync(p));
+        }
+
         const sdkOptions: Parameters<typeof sdk.query>[0]["options"] = {
-          cwd: opts.cwd ?? process.cwd(),
+          cwd: resolvedCwd,
           includePartialMessages: true,
           model: modelId,
           permissionMode: (opts.permissionMode ?? "bypassPermissions") as "bypassPermissions",
           maxTurns: opts.maxTurns ?? 200,
           persistSession: true,
+          ...(claudePath ? { pathToClaudeCodeExecutable: claudePath } : {}),
         };
 
         if (opts.sessionId) {
@@ -291,10 +310,29 @@ export function createClaudeSdkStreamFn(opts: ClaudeSdkStreamOptions = {}): Stre
           sdkOptions.abortController = ac;
         }
 
+        // Ensure cwd exists
+        const fs = await import("node:fs");
+        if (!fs.existsSync(resolvedCwd)) {
+          fs.mkdirSync(resolvedCwd, { recursive: true });
+        }
+
+        // Pass env through to the SDK so it inherits PATH etc.
+        // Also capture stderr for debugging
+        sdkOptions.env = { ...process.env };
+        // @ts-expect-error — stderr callback supported but not in all type defs
+        sdkOptions.stderr = (line: string) => {
+          stderrLines.push(line);
+          if (stderrLines.length <= 5) {
+            log.info("Claude CLI stderr", { line });
+          }
+        };
+
         log.info("Starting Claude SDK query", {
           model: modelId,
-          cwd: sdkOptions.cwd,
-          hasSessionId: Boolean(opts.sessionId),
+          cwd: resolvedCwd,
+          cwdExists: fs.existsSync(resolvedCwd),
+          prompt: prompt.slice(0, 100),
+          path: process.env.PATH?.split(":").slice(0, 3).join(":"),
         });
 
         // State for accumulating the streaming response
@@ -455,7 +493,13 @@ export function createClaudeSdkStreamFn(opts: ClaudeSdkStreamOptions = {}): Stre
           gotResult,
         });
       } catch (err) {
-        log.error("Claude SDK stream error", { error: String(err) });
+        const errObj = err as Error & { stderr?: string; exitCode?: number };
+        log.error("Claude SDK stream error", {
+          error: String(err),
+          stderr: errObj.stderr?.slice(0, 500) || stderrLines.join("\n").slice(0, 500),
+          exitCode: errObj.exitCode,
+          stack: errObj.stack?.slice(0, 500),
+        });
         stream.push({
           type: "error",
           reason: "error",

@@ -1,6 +1,6 @@
 {
   "name": "openorchestra",
-  "version": "0.1.0",
+  "version": "2026.3.28",
   "description": "Multi-channel AI gateway powered by Claude SDK subscription — no API key needed",
   "keywords": ["ai", "claude", "agent", "subscription", "multi-channel"],
   "homepage": "https://github.com/yanhs/OpenOrchestra#readme",
